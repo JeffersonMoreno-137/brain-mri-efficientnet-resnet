@@ -1,121 +1,121 @@
-# Clasificación de MRI Cerebral con Transfer Learning: EfficientNet-B0 y ResNet50
+# Brain MRI Classification with Transfer Learning: EfficientNet-B0 and ResNet50
 
-Este repositorio contiene la implementación, experimentación y análisis cuantitativo y cualitativo de modelos de Deep Learning basados en Transfer Learning y Fine-Tuning para la clasificación multiclase de resonancias magnéticas cerebrales (MRI). El trabajo evalúa y compara el desempeño de EfficientNet-B0 y ResNet50 sobre el dataset Brain Tumor MRI Scans, adaptando representaciones preentrenadas en ImageNet al dominio clínico.
+This repository contains the implementation, experimentation, and comparative quantitative and qualitative analysis of Deep Learning models based on Transfer Learning and Fine-Tuning for multiclass classification of brain Magnetic Resonance Imaging (MRI) scans. The project evaluates and benchmarks EfficientNet-B0 and ResNet50 on the Brain Tumor MRI Scans dataset, adapting representations pretrained on ImageNet to the clinical domain.
 
-Autores: Sergio Pardo, Jefferson Moreno, John Pino  
-Maestría en Inteligencia Artificial — Técnicas de Deep Learning
-
----
-
-## Contenido
-
-1. [Introducción y Contexto Clínico](#introducción-y-contexto-clínico)
-2. [Dataset y Pipeline de Datos](#dataset-y-pipeline-de-datos)
-3. [Arquitecturas y Estrategia de Transfer Learning](#arquitecturas-y-estrategia-de-transfer-learning)
-4. [Configuración de Entrenamiento](#configuración-de-entrenamiento)
-5. [Resultados Cuantitativos](#resultados-cuantitativos)
-6. [Resultados Cualitativos y Curvas de Aprendizaje](#resultados-cualitativos-y-curvas-de-aprendizaje)
-7. [Matrices de Confusión y Diagnóstico Clínico](#matrices-de-confusión-y-diagnóstico-clínico)
-8. [Discusión y Limitaciones](#discusión-y-limitaciones)
-9. [Estructura del Proyecto](#estructura-del-proyecto)
-10. [Instrucciones de Instalación y Uso](#instrucciones-de-instalación-y-uso)
-11. [Referencias](#referencias)
+Authors: Sergio Pardo, Jefferson Moreno, John Pino  
+Master's in Artificial Intelligence — Deep Learning Techniques
 
 ---
 
-## Introducción y Contexto Clínico
+## Table of Contents
 
-La clasificación automatizada de neoplasias intracraneales mediante resonancia magnética (MRI) constituye una herramienta clave de apoyo al diagnóstico médico. La evaluación visual por parte de especialistas es costosa, consume tiempo significativo y presenta variabilidad inter-observador, además de lidiar con factores como artefactos técnicos, ruido de adquisición y heterogeneidad anatómica entre pacientes.
-
-El propósito de esta investigación es determinar el balance óptimo entre costo computacional, capacidad de discriminación morfológica y capacidad de generalización en cortes bidimensionales de MRI. Para ello, se evalúan tres aproximaciones:
-
-1. **EfficientNet-B0:** Modelo optimizado mediante escalado compuesto con ~5.3 millones de parámetros, enfocado en eficiencia de recursos.
-2. **ResNet50 (Transfer Learning):** Arquitectura residual de 25 millones de parámetros con extractor congelado, que aprovecha representaciones genéricas de bajo y medio nivel.
-3. **ResNet50 + Fine-Tuning:** Descongelamiento de las capas convolucionales superiores (bloque `conv5_`) para especializar los filtros abstractos a las texturas y bordes particulares de las lesiones cerebrales.
-
----
-
-## Dataset y Pipeline de Datos
-
-Se utilizó el dataset público **Brain Tumor (MRI Scans)**, compuesto por 7,023 imágenes axiales distribuidas en cuatro clases diagnósticas:
-
-- `glioma`: Tumores gliales con patrones infiltrativos y márgenes difusos.
-- `healthy`: Controles sanos sin hallazgos patológicos tumorales.
-- `meningioma`: Tumores de origen meníngeo, habitualmente extraaxiales con realce homogéneo.
-- `pituitary`: Adenomas hipofisarios ubicados en la fosa selar.
-
-![Muestras del Dataset](figures/02_mri_samples.png)
-
-### Preprocesamiento y Limpieza
-
-- **Filtrado de archivos no válidos:** Eliminación de archivos ocultos del sistema y verificación de integridad de extensiones (`.jpg`, `.jpeg`, `.png`).
-- **Eliminación de duplicados exactos:** Identificación y descarte de copias idénticas a través del cálculo de hash MD5 sobre el flujo binario de cada archivo.
-- **Normalización y escalado espacial:** Redimensionamiento bilineal uniforme a 224x224 píxeles con 3 canales (RGB) y normalización adaptada a las estadísticas del modelo base (ImageNet).
-- **Partición estratificada:** División del conjunto total en proporciones 80% entrenamiento, 10% validación y 10% prueba independiente (semilla 42), conservando la prevalencia de cada patología en todas las particiones.
-- **Data Augmentation:** Aplicado exclusivamente en la etapa de entrenamiento mediante transformaciones geométricas y fotométricas moderadas (volteo horizontal aleatorio, rotación de hasta +/- 15 grados y variación controlada de contraste), preservando la coherencia anatómica sin generar artificios inverosímiles.
-
-![Distribución de Clases](figures/01_dataset_distribution.png)
+1. [Introduction and Clinical Context](#introduction-and-clinical-context)
+2. [Dataset and Data Pipeline](#dataset-and-data-pipeline)
+3. [Model Architectures and Transfer Learning Strategy](#model-architectures-and-transfer-learning-strategy)
+4. [Training Configuration and Protocol](#training-configuration-and-protocol)
+5. [Quantitative Results](#quantitative-results)
+6. [Qualitative Analysis and Learning Curves](#qualitative-analysis-and-learning-curves)
+7. [Confusion Matrices and Diagnostic Breakdown](#confusion-matrices-and-diagnostic-breakdown)
+8. [Discussion and Limitations](#discussion-and-limitations)
+9. [Project Structure](#project-structure)
+10. [Installation and Usage Guide](#installation-and-usage-guide)
+11. [References](#references)
 
 ---
 
-## Arquitecturas y Estrategia de Transfer Learning
+## Introduction and Clinical Context
 
-Ambas familias se adaptaron para clasificar las 4 categorías patológicas mediante capas densas finales con función de activación Softmax.
+Automated classification of intracranial neoplasms using Magnetic Resonance Imaging (MRI) is a critical assistive technology in modern radiology and clinical oncology. Manual examination of brain scans is labor-intensive, subject to inter-observer variability, and demands high clinical expertise. Furthermore, automated models face challenges including acquisition artifacts, signal-to-noise variations, and patient anatomical heterogeneity.
+
+The objective of this research is to evaluate the trade-off between computational cost, feature discriminability, and generalization capacity using 2D axial MRI slices. Three experimental configurations are compared:
+
+1. **EfficientNet-B0:** A compound scaling architecture with ~5.3 million parameters, prioritizing computational efficiency.
+2. **ResNet50 (Transfer Learning):** A 25-million-parameter deep residual network with a frozen feature extractor, leveraging generic low- and mid-level visual features.
+3. **ResNet50 + Fine-Tuning:** Unfreezing the top convolutional blocks (`conv5_x`) to specialize high-level abstract filters to the distinct morphologies, boundaries, and textures of intracranial lesions.
+
+---
+
+## Dataset and Data Pipeline
+
+The project utilizes the public **Brain Tumor (MRI Scans)** benchmark dataset, consisting of 7,023 axial slices categorized into four diagnostic classes:
+
+- `glioma`: Glial cell tumors exhibiting infiltrative growth patterns and ill-defined margins.
+- `healthy`: Normal control scans without pathological or neoplastic findings.
+- `meningioma`: Extra-axial meningeal tumors typically presenting uniform, well-circumscribed enhancement.
+- `pituitary`: Sellar and parasellar adenomas located in the pituitary fossa.
+
+![Dataset Representative Samples](figures/02_mri_samples.png)
+
+### Data Cleaning and Preprocessing Pipeline
+
+- **File Validation:** Automated filtering to discard corrupted files, system artifacts, and unsupported extensions, restricting valid inputs to `.jpg`, `.jpeg`, and `.png`.
+- **Exact Duplicate Deduplication:** Elimination of duplicate images through cryptographic MD5 hashing of raw file contents.
+- **Spatial Resizing and Normalization:** Uniform bilinear resizing to 224x224 pixels with 3 RGB channels, followed by normalization calibrated to ImageNet statistics.
+- **Stratified Partitioning:** Splitting into 80% training, 10% validation, and 10% independent test sets (random seed 42), strictly preserving class proportions across splits.
+- **Data Augmentation:** Applied exclusively during training to enhance generalization while maintaining anatomical validity (random horizontal flips, rotations up to +/- 15 degrees, and controlled contrast adjustments).
+
+![Class Distribution](figures/01_dataset_distribution.png)
+
+---
+
+## Model Architectures and Transfer Learning Strategy
+
+Both model families were adapted for 4-class classification using classification heads with Softmax activation.
 
 ```
-Pipeline de Clasificación:
-Entrada (224x224x3) -> Augmentation (Train) -> Preprocesamiento ImageNet -> Backbone Preentrenado -> GlobalAveragePooling2D -> Dropout(0.2) -> Dense(4, Softmax)
+End-to-End Processing Architecture:
+Input (224x224x3) -> Augmentation (Train only) -> ImageNet Preprocessing -> Pretrained Backbone -> GlobalAveragePooling2D -> Dropout(0.2) -> Dense(4, Softmax)
 ```
 
 ### 1. EfficientNet-B0
-- **Total de parámetros:** ~5.3M.
-- **Estrategia:** Extractor convolucional congelado; únicamente se entrena la cabeza de clasificación (1,280 -> 4), con ~5,124 parámetros entrenables.
+- **Total Parameters:** ~5.3M.
+- **Strategy:** Frozen convolutional feature extractor; training is restricted to the final dense classification layer (1,280 -> 4), resulting in ~5,124 trainable parameters.
 
 ### 2. ResNet50 (Transfer Learning)
-- **Total de parámetros:** ~25M.
-- **Estrategia:** Backbone congelado; capa `GlobalAveragePooling2D` conectada a `Dropout(0.2)` y `Dense(4, Softmax)`.
+- **Total Parameters:** ~25M.
+- **Strategy:** Frozen backbone; `GlobalAveragePooling2D` layer followed by `Dropout(0.2)` and a 4-unit `Dense(Softmax)` head.
 
-### 3. ResNet50 con Fine-Tuning
-- **Estrategia:** Tomando como punto de partida los pesos del mejor checkpoint de la etapa de Transfer Learning, se descongelan todas las capas correspondientes al bloque `conv5_x`.
-- **Estabilidad de capas Batch Normalization:** Las capas `BatchNormalization` se mantienen expresamente congeladas (`trainable = False`) para evitar distorsiones en las estadísticas de media y varianza móvil calculadas sobre ImageNet.
-
----
-
-## Configuración de Entrenamiento
-
-Todos los esquemas fueron entrenados bajo condiciones homogéneas para garantizar una comparación equitativa:
-
-- **Optimizador:** Adam.
-- **Función de pérdida:** Sparse Categorical Cross-Entropy.
-- **Tamaño de lote (batch size):** 32.
-- **Tasa de aprendizaje (Learning Rate):**
-  - Fase de Transfer Learning: 1e-3.
-  - Fase de Fine-Tuning: 1e-5 (reducción de dos órdenes de magnitud para impedir el olvido catastrófico de características preentrenadas).
-- **Épocas:** 10 épocas en cada fase.
-- **Criterio de parada y selección de checkpoint:** Monitoreo estricto de la menor pérdida de validación (`val_loss`), seleccionado sobre `val_accuracy` por penalizar la sobreconfianza en predicciones erróneas.
-- **Hardware de ejecución:** Aceleración por GPU/MPS con asignación dinámica de memoria y prefetch paralelo con `tf.data.AUTOTUNE`.
+### 3. ResNet50 with Fine-Tuning
+- **Strategy:** Initialized from the best checkpoint obtained in the Transfer Learning stage, followed by unfreezing all convolutional layers in the `conv5_x` block.
+- **Batch Normalization Stability:** All `BatchNormalization` layers remain strictly frozen (`trainable = False`) to prevent distortion of moving mean and variance statistics learned on ImageNet.
 
 ---
 
-## Resultados Cuantitativos
+## Training Configuration and Protocol
 
-La evaluación definitiva se llevó a cabo sobre el conjunto de prueba independiente (10% del dataset original, 703 imágenes), el cual permaneció completamente aislado de las fases de entrenamiento y ajuste de hiperparámetros.
+All models were evaluated under uniform training conditions to guarantee experimental fairness:
 
-### Tabla I. Comparación de Rendimiento Global en Conjunto de Prueba
+- **Optimizer:** Adam.
+- **Loss Function:** Sparse Categorical Cross-Entropy.
+- **Batch Size:** 32.
+- **Learning Rate Schedule:**
+  - Transfer Learning stage: 1e-3.
+  - Fine-Tuning stage: 1e-5 (two orders of magnitude reduction to mitigate catastrophic forgetting of pretrained weights).
+- **Epochs:** 10 epochs per phase.
+- **Model Selection Criterion:** Continuous monitoring of validation loss (`val_loss`), chosen over `val_accuracy` due to its ability to penalize overconfident incorrect predictions.
+- **Hardware Acceleration:** GPU / Apple Silicon (MPS) acceleration using `tf.data.AUTOTUNE` for multi-threaded parallel prefetching.
 
-| Modelo | Test Loss | Test Accuracy | Macro F1-Score | Parámetros Entrenables |
+---
+
+## Quantitative Results
+
+Final evaluation was performed on the independent test split (10% of total data, 703 images), which remained entirely untouched throughout training and hyperparameter optimization.
+
+### Table I. Overall Performance Comparison on Independent Test Set
+
+| Model Architecture | Test Loss | Test Accuracy | Macro F1-Score | Trainable Parameters |
 |:---|:---:|:---:|:---:|:---:|
 | EfficientNet-B0 | 0.2885 | 89.24% | 0.8878 | ~5 K |
 | ResNet50 (TL) | 0.2049 | 92.73% | 0.9253 | ~8 K |
 | **ResNet50 + Fine-Tuning** | **0.1172** | **96.67%** | **0.9657** | **~15 M** |
 
-ResNet50 con Fine-Tuning superó en **7.43 puntos porcentuales** a EfficientNet-B0 y en **3.94 puntos porcentuales** a ResNet50 con Transfer Learning base, alcanzando una pérdida de prueba de 0.1172.
+ResNet50 with Fine-Tuning outperformed EfficientNet-B0 by **7.43 percentage points** and base ResNet50 Transfer Learning by **3.94 percentage points**, achieving a test loss of 0.1172.
 
-![Comparación Global de Accuracy](figures/16_models_accuracy_comparison.png)
+![Test Accuracy Comparison](figures/16_models_accuracy_comparison.png)
 
-### Tabla II. Rendimiento Detallado por Clase (F1-Score)
+### Table II. Class-Level Performance Breakdown (F1-Score)
 
-| Clase Patológica | EfficientNet-B0 | ResNet50 (TL) | ResNet50 + Fine-Tuning | Mejor Configuración |
+| Pathological Class | EfficientNet-B0 | ResNet50 (TL) | ResNet50 + Fine-Tuning | Best Performing Configuration |
 |:---|:---:|:---:|:---:|:---:|
 | `glioma` | 0.8393 | 0.9185 | **0.9657** | ResNet50 + FT |
 | `healthy` | 0.9647 | 0.9600 | **0.9730** | ResNet50 + FT |
@@ -124,33 +124,33 @@ ResNet50 con Fine-Tuning superó en **7.43 puntos porcentuales** a EfficientNet-
 
 ---
 
-## Resultados Cualitativos y Curvas de Aprendizaje
+## Qualitative Analysis and Learning Curves
 
-### Curvas de Aprendizaje: EfficientNet-B0
+### Learning Curves: EfficientNet-B0
 
-EfficientNet-B0 exhibe convergencia regular pero limitada por la baja dimensionalidad del espacio de adaptación; el modelo converge tempranamente hacia una exactitud de validación cercana al 89%, reflejando un ligero subajuste (underfitting) relativo al dominio de resonancias magnéticas.
+EfficientNet-B0 shows smooth convergence; however, due to its compact parameterization and frozen feature extractor, validation accuracy plateaus near 89%, indicating relative underfitting on domain-specific medical textures.
 
-![Curvas EfficientNet-B0](figures/03_efficientnet_learning_curves.png)
+![EfficientNet-B0 Curves](figures/03_efficientnet_learning_curves.png)
 
-### Curvas de Aprendizaje: ResNet50 (Transfer Learning y Fine-Tuning)
+### Learning Curves: ResNet50 (Transfer Learning and Fine-Tuning)
 
-La evolución completa de ResNet50 demuestra la efectividad de la transición en dos fases. Durante las primeras 10 épocas (red base congelada), la pérdida desciende sostenidamente. Tras habilitar el fine-tuning en la época 10 con una tasa de aprendizaje de 1e-5, el modelo experimenta una reducción adicional pronunciada en la función de pérdida sin presentar divergencia o inestabilidad numérica.
+The complete two-phase training trajectory of ResNet50 demonstrates the impact of layered adaptation. During initial epochs (frozen extractor), loss decreases steadily. Upon activating fine-tuning at epoch 10 with a reduced learning rate of 1e-5, cross-entropy loss experiences a sharp further reduction without numerical instability.
 
-![Curvas Combinadas ResNet50](figures/06_resnet50_vs_ft_combined.png)
+![ResNet50 Combined Learning Curves](figures/06_resnet50_vs_ft_combined.png)
 
 ---
 
-## Matrices de Confusión y Diagnóstico Clínico
+## Confusion Matrices and Diagnostic Breakdown
 
-El desglose de clasificaciones correctas e incorrectas en el conjunto de prueba evidencia la concentración de incertidumbre entre pares patológicos con similitud de textura tisular.
+The distribution of test set errors reveals that diagnostic ambiguity is primarily concentrated between classes with overlapping morphological characteristics.
 
-![Matrices de Confusión Comparativas](figures/composite_confusion_matrices.png)
+![Confusion Matrices Comparison](figures/composite_confusion_matrices.png)
 
-*De izquierda a derecha: Matrices de confusión en prueba para EfficientNet-B0, ResNet50 y ResNet50 + Fine-Tuning.*
+*From left to right: Test confusion matrices for EfficientNet-B0, ResNet50, and ResNet50 + Fine-Tuning.*
 
-### Tabla III. Desglose de Matriz Diagnóstica por Arquitectura y Tipo de Lesión
+### Table III. Detailed Diagnostic Matrix Breakdown by Class and Architecture
 
-| Modelo | Patología | Verdaderos Positivos (VP) | Verdaderos Negativos (VN) | Falsos Negativos (FN) | Falsos Positivos (FP) |
+| Model | Class | True Positives (TP) | True Negatives (TN) | False Negatives (FN) | False Positives (FP) |
 |:---|:---|:---:|:---:|:---:|:---:|
 | **EfficientNet-B0** | Glioma | 141 | 480 | 21 | 18 |
 | | Healthy | 164 | 484 | 7 | 5 |
@@ -165,41 +165,41 @@ El desglose de clasificaciones correctas e incorrectas en el conjunto de prueba 
 | | **Meningioma** | **147** | **492** | **6** | **15** |
 | | **Pituitary** | **170** | **484** | **4** | **2** |
 
-### Inspección Visual de Aciertos y Fallos
+### Visual Inspection of Predictions: Successes and Failure Cases
 
-El análisis de casos individuales revela que los falsos negativos en meningioma corresponden preponderantemente a imágenes donde el tumor se proyecta cerca del parénquima cerebral sin hiperintensidad nítida, lo que confunde a los modelos con gliomas de bajo grado. Con el fine-tuning, el modelo adquiere filtros capaces de resolver la interfaz aracnoidea y la base dural, reduciendo los falsos negativos de 39 a solo 6.
+Qualitative review indicates that false negatives in meningioma largely occur when tumors abut brain parenchyma without marked hyperintensity, leading to confusion with low-grade gliomas. Fine-tuning allows the network to learn subtle boundary features and dural attachment cues, reducing false negatives from 39 down to 6.
 
-![Predicciones Cualitativas ResNet50 FT](figures/15_resnet50_ft_qualitative.png)
-
----
-
-## Discusión y Limitaciones
-
-1. **Capacidad Representacional y Especialización:** ResNet50 ofrece una base de extracción con mayor expresividad respecto a EfficientNet-B0 para imágenes médicas con cortes axiales complejos. El ajuste fino del bloque `conv5_` resulta indispensable para adaptar los núcleos convolucionales de alto nivel a las morfologías oncológicas.
-2. **Impacto en Falsos Negativos Clínicos:** En la práctica médica, un falso negativo en patología tumoral conlleva implicaciones severas. ResNet50 + FT elevó el recall en meningioma de 0.7451 a 0.9608, consolidando una frontera de decisión sustancialmente más confiable.
-3. **Control del Sobreajuste:** Aunque al cierre del entrenamiento la brecha train/val fue de 99.17% contra 97.27%, la preservación del checkpoint con mínima pérdida de validación en la época 7 contuvo la degradación del poder de generalización.
-4. **Limitación Metodológica:** La partición del dataset se estructuró a nivel de corte individual en lugar de a nivel de paciente. Esta condición, habitual en benchmarks públicos sin metadatos clínicos adicionales, puede inducir una ligera sobreestimación de la generalización en entornos de distribución libre.
+![ResNet50 Fine-Tuning Qualitative Inspection](figures/15_resnet50_ft_qualitative.png)
 
 ---
 
-## Estructura del Proyecto
+## Discussion and Limitations
+
+1. **Representational Capacity vs. Parameter Efficiency:** ResNet50 exhibits superior feature representation compared to EfficientNet-B0 on complex brain slice textures. Fine-tuning the `conv5_x` block is crucial for tailoring generic ImageNet filters to intracranial lesions.
+2. **Clinical Significance of False Negative Reduction:** In diagnostic settings, false negatives in tumor detection pose the greatest clinical risk. ResNet50 + FT raised meningioma recall from 0.7451 to 0.9608, substantially improving diagnostic safety.
+3. **Overfitting Containment:** While the final training and validation accuracies showed a gap (99.17% vs. 97.27%), checkpoint selection based on minimum validation loss at epoch 7 effectively prevented generalization decay.
+4. **Methodological Limitation:** The dataset split was performed at the slice level rather than the patient level due to lack of subject metadata in the public benchmark, which is an inherent limitation when assessing out-of-distribution clinical generalization.
+
+---
+
+## Project Structure
 
 ```
 brain-mri-efficientnet-resnet/
-├── README.md                          # Documentación técnica completa del proyecto
-├── LICENSE                            # Licencia MIT
-├── requirements.txt                   # Dependencias reproducibles de Python
-├── main.py                            # Punto de entrada por línea de comandos
-├── src/                               # Código modular de la solución
-│   ├── __init__.py                    # Módulo principal
-│   ├── config.py                      # Hiperparámetros, rutas y semillas aleatorias
-│   ├── data.py                        # Carga, verificación MD5, partición y tf.data pipeline
-│   ├── models.py                      # Definición de EfficientNet-B0, ResNet50 y fine-tuning
-│   ├── train.py                       # Bucles de entrenamiento y callbacks de guardado
-│   └── evaluate.py                    # Cálculo de métricas, reportes y matrices de confusión
-├── notebooks/                         # Cuadernos interactivos
-│   └── brain_mri_classification.ipynb # Cuaderno reproducible paso a paso
-├── figures/                           # Gráficos, curvas y matrices de resultados
+├── README.md                          # Technical project documentation
+├── LICENSE                            # MIT License
+├── requirements.txt                   # Reproducible Python dependencies
+├── main.py                            # Command-line interface entry point
+├── src/                               # Modular source code
+│   ├── __init__.py                    # Package initializer
+│   ├── config.py                      # Centralized paths, seeds, and hyperparameters
+│   ├── data.py                        # MD5 deduplication, stratified splits, tf.data pipeline
+│   ├── models.py                      # Architectures for EfficientNet-B0 and ResNet50
+│   ├── train.py                       # Training routines and checkpoint callbacks
+│   └── evaluate.py                    # Evaluation metrics, confusion matrices, reporting
+├── notebooks/                         # Interactive exploratory notebooks
+│   └── brain_mri_classification.ipynb # End-to-end reproducible Jupyter Notebook
+├── figures/                           # High-resolution experiment figures and plots
 │   ├── 01_dataset_distribution.png
 │   ├── 02_mri_samples.png
 │   ├── 03_efficientnet_learning_curves.png
@@ -217,39 +217,39 @@ brain-mri-efficientnet-resnet/
 │   ├── 15_resnet50_ft_qualitative.png
 │   ├── 16_models_accuracy_comparison.png
 │   └── composite_confusion_matrices.png
-└── docs/                              # Artículos, notas y referencias de respaldo
+└── docs/                              # Reports and experimental documentation
     ├── informe_final_microproyecto1.md
     └── cnn_mri_pytorch_reference.md
 ```
 
 ---
 
-## Instrucciones de Instalación y Uso
+## Installation and Usage Guide
 
-### 1. Clonar el Repositorio
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/JeffersonMoreno-137/brain-mri-efficientnet-resnet.git
 cd brain-mri-efficientnet-resnet
 ```
 
-### 2. Crear y Activar un Entorno Virtual
+### 2. Set Up Virtual Environment
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Instalar Dependencias
+### 3. Install Dependencies
 
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Estructura del Dataset
+### 4. Dataset Placement
 
-Descargue el dataset de Kaggle (Rajarshi Mandal: Brain Tumor MRI Scans) y ubíquelo en la raíz bajo la carpeta `dataset/`:
+Download the Kaggle dataset (*Brain Tumor (MRI Scans)* by Rajarshi Mandal) and place it under the `dataset/` root directory:
 
 ```
 dataset/
@@ -259,21 +259,21 @@ dataset/
 └── pituitary/
 ```
 
-### 5. Ejecutar Entrenamiento y Evaluación
+### 5. Running Training and Evaluation
 
-Entrenar y evaluar todos los modelos:
+Train and evaluate all models:
 
 ```bash
 python main.py --model all
 ```
 
-Ejecutar únicamente ResNet50 con Fine-Tuning:
+Run ResNet50 with Fine-Tuning only:
 
 ```bash
 python main.py --model resnet50 --fine-tune
 ```
 
-Ejecutar mediante Jupyter Notebook:
+Run interactively via Jupyter Notebook:
 
 ```bash
 jupyter notebook notebooks/brain_mri_classification.ipynb
@@ -281,7 +281,7 @@ jupyter notebook notebooks/brain_mri_classification.ipynb
 
 ---
 
-## Referencias
+## References
 
 1. Tan, M., & Le, Q. V. (2019). *EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks*. International Conference on Machine Learning (ICML). https://arxiv.org/abs/1905.11946
 2. He, K., Zhang, X., Ren, S., & Sun, J. (2016). *Deep Residual Learning for Image Recognition*. IEEE Conference on Computer Vision and Pattern Recognition (CVPR). https://arxiv.org/abs/1512.03385
